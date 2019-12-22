@@ -2,46 +2,43 @@ package salt.and.pepper;
 
 import lombok.extern.slf4j.Slf4j;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 import java.util.Arrays;
 
 @Slf4j
 public class Main {
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, NoSuchAlgorithmException, IllegalBlockSizeException, InvalidKeyException, BadPaddingException, InvalidKeySpecException, NoSuchPaddingException {
         InputStream inputStream = Main.class.getResourceAsStream("/cipheredText.txt");
         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-        byte[] bytes = getBytesFromReader(reader);
-        log.info("Read number of bytes: " + bytes.length);
+        byte[] initialBytes = Utils.getBytesFromReader(reader);
+        log.info("Read number of bytes: " + initialBytes.length);
 
-        String salt = getSaltFromBytes(bytes);
+        byte[] saltHash = Utils.getSaltHash(initialBytes, 20);
+        log.info("Salt hash: " + Arrays.toString(saltHash));
+        log.info("Salt hash length: " + saltHash.length);
+
+        int counter = Utils.getCounter(initialBytes, 20, 24);
+        log.info("counter: " + counter);
+
+        byte[] cipheredText = Utils.getCipheredText(initialBytes, 24);
+        log.info("CipheredText: " + Arrays.toString(cipheredText));
+        log.info("Ciphered text length: " + cipheredText.length);
+
+        String salt = Utils.getSaltFromHash(saltHash);
         log.info("Salt: " + salt);
         log.info("Salt length: " + salt.length());
 
-        String cipheredText = getCipheredText(bytes);
-        log.info("CipheredText: " + cipheredText);
-        log.info("Ciphered text length: " + cipheredText.length());
+        String keyModel = "l***4***";
 
-        log.info("Combined length: " + (salt.length() + cipheredText.length()));
-    }
-
-    private static String getCipheredText(byte[] bytes) {
-        return new String(Arrays.copyOfRange(bytes, 8, bytes.length), StandardCharsets.UTF_8);
-    }
-
-    private static String getSaltFromBytes(byte[] bytes) {
-        return new String(Arrays.copyOfRange(bytes, 0, 7), StandardCharsets.UTF_16LE);
-    }
-
-    private static byte[] getBytesFromReader(BufferedReader reader) throws IOException {
-        String[] bytesInStrings = reader.readLine().split(" ");
-        byte[] bytes = new byte[bytesInStrings.length];
-        for (int i = 0; i < bytesInStrings.length; i++) {
-            bytes[i] = (byte) Integer.parseInt(bytesInStrings[i], 16);
-        }
-        return bytes;
+        Utils.generateBigFileOfDecryptedInfo(cipheredText, salt.getBytes(), counter, "/tmp/texts.txt");
     }
 }

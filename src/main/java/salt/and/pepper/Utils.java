@@ -7,17 +7,21 @@ import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Slf4j
 public class Utils {
-    private static final char[] POSSIBLE_PASSWORD_CHARS;
+    private static final char[] POSSIBLE_CHARS;
+
     static {
         List<Character> list = new ArrayList<>();
         for (char c = 'a'; c <= 'z'; c++) {
@@ -26,9 +30,9 @@ public class Utils {
         for (char c = '0'; c <= '9'; c++) {
             list.add(c);
         }
-        POSSIBLE_PASSWORD_CHARS = new char[list.size()];
+        POSSIBLE_CHARS = new char[list.size()];
         for (int i = 0; i < list.size(); i++) {
-            POSSIBLE_PASSWORD_CHARS[i] = list.get(i);
+            POSSIBLE_CHARS[i] = list.get(i);
         }
     }
 
@@ -70,7 +74,7 @@ public class Utils {
                         bytes[6] = (byte) l;
                         byte[] calculatedHash = messageDigest.digest(bytes);
                         if (Arrays.equals(hash, calculatedHash)) {
-                           return new String(bytes, StandardCharsets.UTF_16LE);
+                            return new String(bytes, StandardCharsets.UTF_16LE);
                         }
                     }
                 }
@@ -79,17 +83,21 @@ public class Utils {
         throw new RuntimeException("Cannot find salt, bad hash");
     }
 
-    //TODO определиться с кодировкой и с типом шифра в целом
-    public static void generateBigFileOfDecryptedInfo(byte[] cipheredText, byte[] salt, int counter, String path) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+    public static void generateBigFileOfDecryptedInfo(byte[] cipheredText, byte[] salt, int counter, String path, int thread, int allThreads) throws IOException, GeneralSecurityException {
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File(path)));
-        int i = 0;
-        for (char first : POSSIBLE_PASSWORD_CHARS) {
-            for (char second : POSSIBLE_PASSWORD_CHARS) {
-                for (char third : POSSIBLE_PASSWORD_CHARS) {
-                    for (char fifth : POSSIBLE_PASSWORD_CHARS) {
-                        for (char sixth : POSSIBLE_PASSWORD_CHARS) {
-                            for (char seventh : POSSIBLE_PASSWORD_CHARS) {
-                                char[] password = new char[]{'l', first, second, third, '4', fifth, sixth, seventh};
+        String end1 = new String(new char[]{0x00, 0x00, 0x00});
+        String end2 = new String(new char[]{0x06, 0x06, 0x06});
+        int blockLength = POSSIBLE_CHARS.length / allThreads;
+        int offset = blockLength * thread;
+        int iteratedPasswords = 0;
+        for (int i = offset; i < offset + blockLength; i++) {
+            char c1 = POSSIBLE_CHARS[i];
+            for (char c2 : POSSIBLE_CHARS) {
+                for (char c3 : POSSIBLE_CHARS) {
+                    for (char c4 : POSSIBLE_CHARS) {
+                        for (char c5 : POSSIBLE_CHARS) {
+                            for (char c6 : POSSIBLE_CHARS) {
+                                char[] password = new char[]{'l', c1, c2, c3, '4', c4, c5, c6};
                                 PBEKeySpec spec = new PBEKeySpec(password, salt, counter, 256);
                                 SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
                                 SecretKey key = skf.generateSecret(spec);
@@ -98,10 +106,13 @@ public class Utils {
                                 cipher.init(Cipher.DECRYPT_MODE, secretKeySpec);
                                 byte[] decryptedBytes = cipher.doFinal(cipheredText);
                                 String str = new String(decryptedBytes, StandardCharsets.UTF_8);
-                                if (str.length() == 32) {
-                                    writer.write(str);
+                                if (str.length() == cipheredText.length && (str.endsWith(end1) || str.endsWith(end2))) {
+                                    writer.write(str + "::" + new String(password));
                                 }
-                                System.out.printf("progress: %10.10f%%; passwords checked: %10d\r", 1.0 * (i++) / 2176782336L, i);
+                                iteratedPasswords++;
+                                if (iteratedPasswords % 1000000 == 0) {
+                                   log.info(" - passwords iterated: " + iteratedPasswords);
+                                }
                             }
                         }
                     }

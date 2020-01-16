@@ -9,14 +9,19 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 @Slf4j
 public class Main {
-    public static void main(String[] args) throws IOException, NoSuchAlgorithmException, IllegalBlockSizeException, InvalidKeyException, BadPaddingException, InvalidKeySpecException, NoSuchPaddingException {
+    public static final int THREADS_NUMBER = 4;
+
+    public static void main(String[] args) throws IOException, GeneralSecurityException {
         InputStream inputStream = Main.class.getResourceAsStream("/cipheredText.txt");
         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
         byte[] initialBytes = Utils.getBytesFromReader(reader);
@@ -39,6 +44,18 @@ public class Main {
 
         String keyModel = "l***4***";
 
-        Utils.generateBigFileOfDecryptedInfo(cipheredText, salt.getBytes(), counter, "/tmp/texts.txt");
+        List<PasswordPicker> passwordPickers = new ArrayList<>();
+        for (int i = 0; i < THREADS_NUMBER; i++) {
+            passwordPickers.add(new PasswordPicker(Arrays.copyOfRange(cipheredText, 16, 32),
+                    Arrays.copyOf(salt.getBytes(), salt.getBytes().length),
+                    "/tmp/texts" + (i+1) + ".txt",
+                    counter,
+                    i,
+                    THREADS_NUMBER));
+        }
+
+        for (PasswordPicker passwordPicker : passwordPickers) {
+            new Thread(passwordPicker).start();
+        }
     }
 }

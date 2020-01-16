@@ -2,17 +2,11 @@ package salt.and.pepper;
 
 import lombok.extern.slf4j.Slf4j;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.security.GeneralSecurityException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -24,7 +18,7 @@ public class Main {
     public static void main(String[] args) throws IOException, GeneralSecurityException {
         InputStream inputStream = Main.class.getResourceAsStream("/cipheredText.txt");
         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-        byte[] initialBytes = Utils.getBytesFromReader(reader);
+        byte[] initialBytes = Utils.getBytesFromBytesString(reader.readLine());
         log.info("Read number of bytes: " + initialBytes.length);
 
         byte[] saltHash = Utils.getSaltHash(initialBytes, 20);

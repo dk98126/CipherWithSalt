@@ -7,19 +7,17 @@ import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.security.GeneralSecurityException;
-import java.security.InvalidKeyException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedList;
+import java.util.Base64;
 import java.util.List;
-import java.util.stream.Stream;
 
 @Slf4j
 public class Utils {
+    private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
+
     private static final char[] POSSIBLE_CHARS;
 
     static {
@@ -52,8 +50,8 @@ public class Utils {
         return (reversedCounter[3] << 24) ^ (reversedCounter[2] << 16) ^ (reversedCounter[1] << 8) ^ reversedCounter[0];
     }
 
-    public static byte[] getBytesFromReader(BufferedReader reader) throws IOException {
-        String[] bytesInStrings = reader.readLine().split(" ");
+    public static byte[] getBytesFromBytesString(String string) {
+        String[] bytesInStrings = string.split(" ");
         byte[] bytes = new byte[bytesInStrings.length];
         for (int i = 0; i < bytesInStrings.length; i++) {
             bytes[i] = (byte) Integer.parseInt(bytesInStrings[i], 16);
@@ -98,14 +96,7 @@ public class Utils {
                         for (char c5 : POSSIBLE_CHARS) {
                             for (char c6 : POSSIBLE_CHARS) {
                                 char[] password = new char[]{'l', c1, c2, c3, '4', c4, c5, c6};
-                                PBEKeySpec spec = new PBEKeySpec(password, salt, counter, 256);
-                                SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
-                                SecretKey key = skf.generateSecret(spec);
-                                SecretKeySpec secretKeySpec = new SecretKeySpec(key.getEncoded(), "AES");
-                                Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
-                                cipher.init(Cipher.DECRYPT_MODE, secretKeySpec);
-                                byte[] decryptedBytes = cipher.doFinal(cipheredText);
-                                String str = new String(decryptedBytes, StandardCharsets.UTF_8);
+                                String str = getDecryptedString(cipheredText, salt, counter, password);
                                 if (str.length() == cipheredText.length && (str.endsWith(end1) || str.endsWith(end2))) {
                                     writer.write(str + "::" + new String(password));
                                 }
@@ -119,5 +110,53 @@ public class Utils {
                 }
             }
         }
+    }
+
+    public static String getDecryptedString(byte[] cipheredText, byte[] salt, int counter, char[] password) throws NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+        PBEKeySpec spec = new PBEKeySpec(password, salt, counter, 256);
+        SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+        SecretKey key = skf.generateSecret(spec);
+        SecretKeySpec secretKeySpec = new SecretKeySpec(key.getEncoded(), "AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
+        cipher.init(Cipher.DECRYPT_MODE, secretKeySpec);
+        byte[] decryptedBytes = cipher.doFinal(cipheredText);
+        return new String(decryptedBytes, StandardCharsets.UTF_16LE);
+    }
+
+    public static byte[] getPasswordHashBytes(char[] password) throws NoSuchAlgorithmException {
+        MessageDigest messageDigest = MessageDigest.getInstance("MD5");
+        byte[] passwordBytes = new String(password).getBytes(StandardCharsets.UTF_8);
+        return messageDigest.digest(passwordBytes);
+    }
+
+    public static char[] getPasswordHashChars(char[] password) throws NoSuchAlgorithmException {
+        MessageDigest messageDigest = MessageDigest.getInstance("MD5");
+        byte[] passwordBytes = new String(password).getBytes(StandardCharsets.UTF_8);
+        byte[] passwordHashBytes = messageDigest.digest(passwordBytes);
+        char[] passwordHashChars = new char[passwordHashBytes.length];
+        for (int i = 0; i < passwordHashChars.length; i++) {
+            passwordHashChars[i] = (char)(passwordHashBytes[i] & 0xFF);
+        }
+        return passwordHashChars;
+    }
+
+    public static String encryptString(String openText, byte[] salt, int counter, char[] password) throws NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+        PBEKeySpec spec = new PBEKeySpec(getPasswordHashChars(password), salt, counter, 256);
+        SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+        byte[] hash = skf.generateSecret(spec).getEncoded();
+        SecretKeySpec secretKeySpec = new SecretKeySpec(hash, "AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
+        return bytesToHex(cipher.doFinal(openText.getBytes(StandardCharsets.UTF_16LE)));
+    }
+
+    public static String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        for (int j = 0; j < bytes.length; j++) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
+            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
+        }
+        return new String(hexChars).toLowerCase();
     }
 }

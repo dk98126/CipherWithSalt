@@ -2,16 +2,20 @@ package salt.and.pepper;
 
 import lombok.extern.slf4j.Slf4j;
 
-import javax.crypto.*;
+import javax.crypto.Cipher;
+import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.*;
-import java.security.spec.InvalidKeySpecException;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
 
 @Slf4j
@@ -96,7 +100,7 @@ public class Utils {
                         for (char c5 : POSSIBLE_CHARS) {
                             for (char c6 : POSSIBLE_CHARS) {
                                 char[] password = new char[]{'l', c1, c2, c3, '4', c4, c5, c6};
-                                String str = getDecryptedString(cipheredText, salt, counter, password);
+                                String str = decryptString(cipheredText, password, salt, counter);
                                 if (str.length() == cipheredText.length && (str.endsWith(end1) || str.endsWith(end2))) {
                                     writer.write(str + "::" + new String(password));
                                 }
@@ -112,21 +116,18 @@ public class Utils {
         }
     }
 
-    public static String getDecryptedString(byte[] cipheredText, byte[] salt, int counter, char[] password) throws NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
-        PBEKeySpec spec = new PBEKeySpec(password, salt, counter, 256);
-        SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
-        SecretKey key = skf.generateSecret(spec);
-        SecretKeySpec secretKeySpec = new SecretKeySpec(key.getEncoded(), "AES");
+    public static Cipher getCipher(char[] password, byte[] salt, int counter, int decryptMode) throws GeneralSecurityException {
+        byte[] hash = getPBKDF2HashBytes(salt, counter, password);
+        SecretKeySpec secretKeySpec = new SecretKeySpec(hash, "AES");
         Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
-        cipher.init(Cipher.DECRYPT_MODE, secretKeySpec);
-        byte[] decryptedBytes = cipher.doFinal(cipheredText);
-        return new String(decryptedBytes, StandardCharsets.UTF_16LE);
+        cipher.init(decryptMode, secretKeySpec);
+        return cipher;
     }
 
-    public static byte[] getPasswordHashBytes(char[] password) throws NoSuchAlgorithmException {
-        MessageDigest messageDigest = MessageDigest.getInstance("MD5");
-        byte[] passwordBytes = new String(password).getBytes(StandardCharsets.UTF_8);
-        return messageDigest.digest(passwordBytes);
+    public static byte[] getPBKDF2HashBytes(byte[] salt, int counter, char[] password) throws GeneralSecurityException {
+        PBEKeySpec spec = new PBEKeySpec(getPasswordHashChars(password), salt, counter, 256);
+        SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+        return skf.generateSecret(spec).getEncoded();
     }
 
     public static char[] getPasswordHashChars(char[] password) throws NoSuchAlgorithmException {
@@ -140,14 +141,14 @@ public class Utils {
         return passwordHashChars;
     }
 
-    public static String encryptString(String openText, byte[] salt, int counter, char[] password) throws NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
-        PBEKeySpec spec = new PBEKeySpec(getPasswordHashChars(password), salt, counter, 256);
-        SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
-        byte[] hash = skf.generateSecret(spec).getEncoded();
-        SecretKeySpec secretKeySpec = new SecretKeySpec(hash, "AES");
-        Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
-        cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
+    public static String encryptString(String openText, char[] password, byte[] salt, int counter) throws GeneralSecurityException {
+        Cipher cipher = getCipher(password, salt, counter, Cipher.ENCRYPT_MODE);
         return bytesToHex(cipher.doFinal(openText.getBytes(StandardCharsets.UTF_16LE)));
+    }
+
+    public static String decryptString(byte[] cipheredText, char[] password, byte[] salt, int counter) throws GeneralSecurityException {
+        Cipher cipher = getCipher(password, salt, counter, Cipher.DECRYPT_MODE);
+        return new String(cipher.doFinal(cipheredText), StandardCharsets.UTF_16LE);
     }
 
     public static String bytesToHex(byte[] bytes) {

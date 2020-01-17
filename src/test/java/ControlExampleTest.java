@@ -45,7 +45,7 @@ public class ControlExampleTest {
         String encryptedDataStr = "33 DD E1 16 67 DE 28 F2 71 92 4B FF BE 4D 4F 65 4E 17 41 BB 40 A5 85 C4 BD FD 7A 4E FB 24 27 4E";
         byte[] encryptedData = Utils.getBytesFromBytesString(encryptedDataStr);
         String expected = Utils.bytesToHex(encryptedData);
-        String actual = Utils.encryptString(openText, password, salt.getBytes(StandardCharsets.UTF_16LE), 282);
+        String actual = Utils.bytesToHex(Utils.encryptString(openText, password, salt.getBytes(StandardCharsets.UTF_16LE), 282));
         Assert.assertEquals(expected, actual);
     }
 
@@ -58,6 +58,16 @@ public class ControlExampleTest {
         byte[] encryptedData = Utils.getBytesFromBytesString(encryptedDataStr);
         String actualDecryptedString = Utils.decryptString(encryptedData, password, salt.getBytes(StandardCharsets.UTF_16LE), 282);
         Assert.assertEquals(expectedDecryptedString, actualDecryptedString);
+    }
+
+    @Test
+    public void encryptAndDecryptedDataTest() throws GeneralSecurityException {
+        char[] password = new char[]{'a', 'a', 'a', '0', '0', 'a', 'a', 'a'};
+        String salt = "asdf";
+        String openText = "0, 0, 0, 0, 0, 0";
+        byte[] encryptedData = Utils.encryptString(openText, password, salt.getBytes(StandardCharsets.UTF_16LE), 282);
+        String decryptedText = Utils.decryptString(encryptedData, password, salt.getBytes(StandardCharsets.UTF_16LE), 282);
+        Assert.assertEquals(openText, decryptedText);
     }
 
     @Test
@@ -76,7 +86,7 @@ public class ControlExampleTest {
             }
 
             if (!algos.isEmpty()) {
-                System.out.printf(" --- Provider %s, version %.2f --- %n", prov.getName(), prov.getVersion());
+                System.out.printf(" --- Provider %s, version %.2s --- %n", prov.getName(), prov.getVersionStr());
                 for (Provider.Service service : algos) {
                     String algo = service.getAlgorithm();
                     System.out.printf("Algorithm name: \"%s\"%n", algo);

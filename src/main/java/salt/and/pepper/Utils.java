@@ -141,9 +141,9 @@ public class Utils {
         return passwordHashChars;
     }
 
-    public static String encryptString(String openText, char[] password, byte[] salt, int counter) throws GeneralSecurityException {
+    public static byte[] encryptString(String openText, char[] password, byte[] salt, int counter) throws GeneralSecurityException {
         Cipher cipher = getCipher(password, salt, counter, Cipher.ENCRYPT_MODE);
-        return bytesToHex(cipher.doFinal(openText.getBytes(StandardCharsets.UTF_16LE)));
+        return cipher.doFinal(openText.getBytes(StandardCharsets.UTF_16LE));
     }
 
     public static String decryptString(byte[] cipheredText, char[] password, byte[] salt, int counter) throws GeneralSecurityException {

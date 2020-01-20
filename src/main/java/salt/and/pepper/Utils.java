@@ -3,8 +3,8 @@ package salt.and.pepper;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.crypto.Cipher;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.Mac;
+import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -17,6 +17,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 @Slf4j
 public class Utils {
@@ -87,8 +88,7 @@ public class Utils {
 
     public static void generateBigFileOfDecryptedInfo(byte[] cipheredText, byte[] salt, int counter, String path, int thread, int allThreads) throws IOException, GeneralSecurityException {
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File(path)));
-        String end1 = new String(new char[]{0x00, 0x00, 0x00});
-        String end2 = new String(new char[]{0x06, 0x06, 0x06});
+        String end1 = new String(new char[]{0x00, 0x00});
         int blockLength = POSSIBLE_CHARS.length / allThreads;
         int offset = blockLength * thread;
         int iteratedPasswords = 0;
@@ -100,12 +100,13 @@ public class Utils {
                         for (char c5 : POSSIBLE_CHARS) {
                             for (char c6 : POSSIBLE_CHARS) {
                                 char[] password = new char[]{'l', c1, c2, c3, '4', c4, c5, c6};
-                                String str = decryptString(cipheredText, password, salt, counter);
-                                if (str.length() == cipheredText.length && (str.endsWith(end1) || str.endsWith(end2))) {
-                                    writer.write(str + "::" + new String(password));
-                                }
                                 iteratedPasswords++;
-                                if (iteratedPasswords % 1000000 == 0) {
+                                String str = decryptString(cipheredText, password, salt, counter);
+                                if (str.endsWith(end1)) {
+                                    writer.write(new String(password) + "::" + str);
+                                    writer.newLine();
+                                }
+                                if (iteratedPasswords % 100000 == 0) {
                                    log.info(" - passwords iterated: " + iteratedPasswords);
                                 }
                             }
@@ -114,6 +115,7 @@ public class Utils {
                 }
             }
         }
+        writer.close();
     }
 
     public static Cipher getCipher(char[] password, byte[] salt, int counter, int decryptMode) throws GeneralSecurityException {
@@ -125,30 +127,23 @@ public class Utils {
     }
 
     public static byte[] getPBKDF2HashBytes(byte[] salt, int counter, char[] password) throws GeneralSecurityException {
-        PBEKeySpec spec = new PBEKeySpec(getPasswordHashChars(password), salt, counter, 256);
-        SecretKeyFactory skf = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
-        return skf.generateSecret(spec).getEncoded();
+        return deriveKey(getPasswordHash(password), salt, counter);
     }
 
-    public static char[] getPasswordHashChars(char[] password) throws NoSuchAlgorithmException {
+    public static byte[] getPasswordHash(char[] password) throws NoSuchAlgorithmException {
         MessageDigest messageDigest = MessageDigest.getInstance("MD5");
         byte[] passwordBytes = new String(password).getBytes(StandardCharsets.UTF_8);
-        byte[] passwordHashBytes = messageDigest.digest(passwordBytes);
-        char[] passwordHashChars = new char[passwordHashBytes.length];
-        for (int i = 0; i < passwordHashChars.length; i++) {
-            passwordHashChars[i] = (char)(passwordHashBytes[i] & 0xFF);
-        }
-        return passwordHashChars;
+        return messageDigest.digest(passwordBytes);
     }
 
     public static byte[] encryptString(String openText, char[] password, byte[] salt, int counter) throws GeneralSecurityException {
         Cipher cipher = getCipher(password, salt, counter, Cipher.ENCRYPT_MODE);
-        return cipher.doFinal(openText.getBytes(StandardCharsets.UTF_16LE));
+        return cipher.doFinal(openText.getBytes(StandardCharsets.UTF_8));
     }
 
     public static String decryptString(byte[] cipheredText, char[] password, byte[] salt, int counter) throws GeneralSecurityException {
         Cipher cipher = getCipher(password, salt, counter, Cipher.DECRYPT_MODE);
-        return new String(cipher.doFinal(cipheredText), StandardCharsets.UTF_16LE);
+        return new String(cipher.doFinal(cipheredText), StandardCharsets.UTF_8);
     }
 
     public static String bytesToHex(byte[] bytes) {
@@ -159,5 +154,79 @@ public class Utils {
             hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
         }
         return new String(hexChars).toLowerCase();
+    }
+
+    public static byte[] deriveKey(final byte[] password,
+                                    byte[] salt, int iterCount) throws NoSuchAlgorithmException {
+        Mac prf = Mac.getInstance("HmacSHA1");
+        int keyLength = 32;
+        byte[] key = new byte[keyLength];
+        try {
+            int hlen = prf.getMacLength();
+            int intL = (keyLength + hlen - 1)/hlen; // ceiling
+            int intR = keyLength - (intL - 1)*hlen; // residue
+            byte[] ui = new byte[hlen];
+            byte[] ti = new byte[hlen];
+            // SecretKeySpec cannot be used, since password can be empty here.
+            SecretKey macKey = new SecretKey() {
+                private static final long serialVersionUID = 7874493593505141603L;
+                @Override
+                public String getAlgorithm() {
+                    return prf.getAlgorithm();
+                }
+                @Override
+                public String getFormat() {
+                    return "RAW";
+                }
+                @Override
+                public byte[] getEncoded() {
+                    return password;
+                }
+                @Override
+                public int hashCode() {
+                    return Arrays.hashCode(password) * 41 +
+                            prf.getAlgorithm().toLowerCase(Locale.ENGLISH).hashCode();
+                }
+                @Override
+                public boolean equals(Object obj) {
+                    if (this == obj) return true;
+                    if (this.getClass() != obj.getClass()) return false;
+                    SecretKey sk = (SecretKey)obj;
+                    return prf.getAlgorithm().equalsIgnoreCase(
+                            sk.getAlgorithm()) &&
+                            MessageDigest.isEqual(password, sk.getEncoded());
+                }
+            };
+            prf.init(macKey);
+
+            byte[] ibytes = new byte[4];
+            for (int i = 1; i <= intL; i++) {
+                prf.update(salt);
+                ibytes[3] = (byte) i;
+                ibytes[2] = (byte) ((i >> 8) & 0xff);
+                ibytes[1] = (byte) ((i >> 16) & 0xff);
+                ibytes[0] = (byte) ((i >> 24) & 0xff);
+                prf.update(ibytes);
+                prf.doFinal(ui, 0);
+                System.arraycopy(ui, 0, ti, 0, ui.length);
+
+                for (int j = 2; j <= iterCount; j++) {
+                    prf.update(ui);
+                    prf.doFinal(ui, 0);
+                    // XOR the intermediate Ui's together.
+                    for (int k = 0; k < ui.length; k++) {
+                        ti[k] ^= ui[k];
+                    }
+                }
+                if (i == intL) {
+                    System.arraycopy(ti, 0, key, (i-1)*hlen, intR);
+                } else {
+                    System.arraycopy(ti, 0, key, (i-1)*hlen, hlen);
+                }
+            }
+        } catch (GeneralSecurityException gse) {
+            throw new RuntimeException("Error deriving PBKDF2 keys", gse);
+        }
+        return key;
     }
 }

@@ -15,7 +15,7 @@ public class Main {
 
         List<PasswordPicker> passwordPickers = new ArrayList<>();
         for (int i = 0; i < THREADS_NUMBER; i++) {
-            passwordPickers.add(new PasswordPicker(cipheredText, "acdw".getBytes(StandardCharsets.UTF_16LE),
+            passwordPickers.add(new PasswordPicker(cipheredText, "acwd".getBytes(StandardCharsets.UTF_16LE),
                     "/tmp/texts" + (i+1) + ".txt",
                     280,
                     i,

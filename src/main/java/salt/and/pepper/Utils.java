@@ -100,6 +100,13 @@ public class Utils {
                         for (char c5 : POSSIBLE_CHARS) {
                             for (char c6 : POSSIBLE_CHARS) {
                                 char[] password = new char[]{'l', c1, c2, c3, '4', c4, c5, c6};
+                                byte numbers = 0;
+                                for (char c : password) {
+                                    if (Character.isDigit(c))
+                                        numbers++;
+                                }
+                                if (numbers != 2)
+                                    break;
                                 iteratedPasswords++;
                                 String str = decryptString(cipheredText, password, salt, counter);
                                 if (str.endsWith(end1)) {

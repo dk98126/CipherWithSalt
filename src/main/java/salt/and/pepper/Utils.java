@@ -89,9 +89,27 @@ public class Utils {
     public static void generateBigFileOfDecryptedInfo(byte[] cipheredText, byte[] salt, int counter, String path, int thread, int allThreads) throws IOException, GeneralSecurityException {
         long startTimeMillis = System.currentTimeMillis();
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File(path)));
-        String end1 = new String(new char[]{0x00, 0x00,  0x00, 0x00});
+        String end1 = new String(new char[]{0x00, 0x00, 0x00, 0x00});
         int blockLength = POSSIBLE_CHARS.length / allThreads;
         int offset = blockLength * thread;
+        if (thread <= 12) {
+            blockLength = 26 / 13;
+            offset = blockLength * thread;
+        } else {
+            blockLength = 3;
+            switch (thread) {
+                case 13:
+                    offset = 26;
+                    break;
+                case 14:
+                    offset = 29;
+                    break;
+                case 15:
+                    blockLength = 4;
+                    offset = 32;
+                    break;
+            }
+        }
         int iteratedPasswords = 0;
         for (int i = offset; i < offset + blockLength; i++) {
             char c1 = POSSIBLE_CHARS[i];

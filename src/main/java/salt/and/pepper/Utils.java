@@ -87,6 +87,7 @@ public class Utils {
     }
 
     public static void generateBigFileOfDecryptedInfo(byte[] cipheredText, byte[] salt, int counter, String path, int thread, int allThreads) throws IOException, GeneralSecurityException {
+        long startTimeMillis = System.currentTimeMillis();
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File(path)));
         String end1 = new String(new char[]{0x00, 0x00});
         int blockLength = POSSIBLE_CHARS.length / allThreads;
@@ -112,9 +113,11 @@ public class Utils {
                                 if (str.endsWith(end1)) {
                                     writer.write(new String(password) + "::" + str);
                                     writer.newLine();
+                                    writer.flush();
                                 }
                                 if (iteratedPasswords % 100000 == 0) {
-                                   log.info(" - passwords iterated: " + iteratedPasswords);
+                                    long period = System.currentTimeMillis() - startTimeMillis;
+                                    log.info(" - passwords iterated: " + iteratedPasswords + "\t time spent: " + (period / 1000) + "seconds");
                                 }
                             }
                         }
@@ -164,41 +167,46 @@ public class Utils {
     }
 
     public static byte[] deriveKey(final byte[] password,
-                                    byte[] salt, int iterCount) throws NoSuchAlgorithmException {
+                                   byte[] salt, int iterCount) throws NoSuchAlgorithmException {
         Mac prf = Mac.getInstance("HmacSHA1");
         int keyLength = 32;
         byte[] key = new byte[keyLength];
         try {
             int hlen = prf.getMacLength();
-            int intL = (keyLength + hlen - 1)/hlen; // ceiling
-            int intR = keyLength - (intL - 1)*hlen; // residue
+            int intL = (keyLength + hlen - 1) / hlen; // ceiling
+            int intR = keyLength - (intL - 1) * hlen; // residue
             byte[] ui = new byte[hlen];
             byte[] ti = new byte[hlen];
             // SecretKeySpec cannot be used, since password can be empty here.
             SecretKey macKey = new SecretKey() {
                 private static final long serialVersionUID = 7874493593505141603L;
+
                 @Override
                 public String getAlgorithm() {
                     return prf.getAlgorithm();
                 }
+
                 @Override
                 public String getFormat() {
                     return "RAW";
                 }
+
                 @Override
                 public byte[] getEncoded() {
                     return password;
                 }
+
                 @Override
                 public int hashCode() {
                     return Arrays.hashCode(password) * 41 +
                             prf.getAlgorithm().toLowerCase(Locale.ENGLISH).hashCode();
                 }
+
                 @Override
                 public boolean equals(Object obj) {
                     if (this == obj) return true;
                     if (this.getClass() != obj.getClass()) return false;
-                    SecretKey sk = (SecretKey)obj;
+                    SecretKey sk = (SecretKey) obj;
                     return prf.getAlgorithm().equalsIgnoreCase(
                             sk.getAlgorithm()) &&
                             MessageDigest.isEqual(password, sk.getEncoded());
@@ -226,9 +234,9 @@ public class Utils {
                     }
                 }
                 if (i == intL) {
-                    System.arraycopy(ti, 0, key, (i-1)*hlen, intR);
+                    System.arraycopy(ti, 0, key, (i - 1) * hlen, intR);
                 } else {
-                    System.arraycopy(ti, 0, key, (i-1)*hlen, hlen);
+                    System.arraycopy(ti, 0, key, (i - 1) * hlen, hlen);
                 }
             }
         } catch (GeneralSecurityException gse) {

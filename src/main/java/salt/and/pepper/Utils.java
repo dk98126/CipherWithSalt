@@ -23,7 +23,7 @@ import java.util.Locale;
 public class Utils {
     private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
 
-    private static final char[] POSSIBLE_CHARS;
+    public static final char[] POSSIBLE_CHARS;
 
     static {
         List<Character> list = new ArrayList<>();
@@ -109,7 +109,7 @@ public class Utils {
                                         numbers++;
                                 }
                                 if (numbers != 2)
-                                    break;
+                                    continue;
                                 iteratedPasswords++;
                                 String str = decryptString(cipheredText, password, salt, counter);
                                 if (str.endsWith(end)) {

@@ -68,6 +68,34 @@ public class ControlExampleTest {
     }
 
     @Test
+    public void loopTest() {
+        int iteratedPasswords = 0;
+        for (int i = 0; i < Utils.POSSIBLE_CHARS.length; i++) {
+            char c1 = Utils.POSSIBLE_CHARS[i];
+            for (char c2 : Utils.POSSIBLE_CHARS) {
+                for (char c3 : Utils.POSSIBLE_CHARS) {
+                    for (char c4 : Utils.POSSIBLE_CHARS) {
+                        for (char c5 : Utils.POSSIBLE_CHARS) {
+                            for (char c6 : Utils.POSSIBLE_CHARS) {
+                                char[] password = new char[]{'l', c1, c2, c3, '4', c4, c5, c6};
+                                byte numbers = 0;
+                                for (char c : password) {
+                                    if (Character.isDigit(c))
+                                        numbers++;
+                                }
+                                if (numbers != 2)
+                                    continue;
+                                iteratedPasswords++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Assert.assertEquals(iteratedPasswords, 712882560);
+    }
+
+    @Test
     public void printProvidersTest() {
         Class<?> typeClass = MessageDigest.class;
         for (Provider prov : Security.getProviders()) {

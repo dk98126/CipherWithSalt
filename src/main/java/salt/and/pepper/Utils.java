@@ -86,34 +86,16 @@ public class Utils {
         throw new RuntimeException("Cannot find salt, bad hash");
     }
 
-    public static void generateBigFileOfDecryptedInfo(byte[] cipheredText, byte[] salt, int counter, String path, int thread, int allThreads) throws IOException, GeneralSecurityException {
+    public static void generateBigFileOfDecryptedInfo(final byte[] cipheredText, final byte[] salt, final int counter, final String path, final int thread, final int allThreads) throws IOException, GeneralSecurityException {
         log.info("started execution");
         long startTimeMillis = System.currentTimeMillis();
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File(path)));
-        String end1 = new String(new char[]{0x00, 0x00, 0x00});
-        String end2 = new String(new char[]{0x06, 0x06, 0x06});
-        int blockLength = POSSIBLE_CHARS.length / allThreads;
-        int offset = blockLength * thread;
-        if (thread <= 12) {
-            blockLength = 26 / 13;
-            offset = blockLength * thread;
-        } else {
-            blockLength = 3;
-            switch (thread) {
-                case 13:
-                    offset = 26;
-                    break;
-                case 14:
-                    offset = 29;
-                    break;
-                case 15:
-                    blockLength = 4;
-                    offset = 32;
-                    break;
-            }
-        }
+        String end = "\u0000\u0000\u0000\u0000";
+        int blockLength = 1;
+        int from = blockLength * thread;
+        int to = blockLength + from;
         int iteratedPasswords = 0;
-        for (int i = offset; i < offset + blockLength; i++) {
+        for (int i = from; i < to; i++) {
             char c1 = POSSIBLE_CHARS[i];
             for (char c2 : POSSIBLE_CHARS) {
                 for (char c3 : POSSIBLE_CHARS) {
@@ -130,8 +112,10 @@ public class Utils {
                                     break;
                                 iteratedPasswords++;
                                 String str = decryptString(cipheredText, password, salt, counter);
-                                if (str.endsWith(end1) || str.endsWith(end2)) {
-                                    writer.write(new String(password) + "::" + str);
+                                if (str.endsWith(end)) {
+                                    String stringToWrite = new String(password) + "::" + str;
+                                    log.info("decrypted string!: " + new String(password) + "::" + str);
+                                    writer.write(stringToWrite);
                                     writer.newLine();
                                     writer.flush();
                                 }

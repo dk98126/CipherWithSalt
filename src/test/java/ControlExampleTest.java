@@ -11,8 +11,8 @@ import java.util.Set;
 public class ControlExampleTest {
     @Test
     public void controlSaltTest() throws NoSuchAlgorithmException {
-        String expectedSalt = "asdf";
-        String saltHashStr = "87 81 42 98 D7 96 54 DA 79 20 C1 F1 45 F1 4B F5 01 2A E2 F3";
+        String expectedSalt = "acwd";
+        String saltHashStr = "9F 5B B3 5E 4E 4C E7 B4 2A 1C 76 9A 3F E8 3A A2 27 6D 7F BA";
         byte[] saltHash = Utils.getBytesFromBytesString(saltHashStr);
         String actualSalt = Utils.getSaltFromHash(saltHash);
         Assert.assertEquals(expectedSalt, actualSalt);

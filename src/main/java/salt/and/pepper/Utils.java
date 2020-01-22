@@ -90,7 +90,7 @@ public class Utils {
         log.info("started execution");
         long startTimeMillis = System.currentTimeMillis();
         BufferedWriter writer = new BufferedWriter(new FileWriter(new File(path)));
-        String end1 = new String(new char[]{0x00, 0x00, 0x00, 0x00});
+        String end = new String(new char[]{0x00, 0x00, 0x00});
         int blockLength = POSSIBLE_CHARS.length / allThreads;
         int offset = blockLength * thread;
         if (thread <= 12) {
@@ -129,7 +129,7 @@ public class Utils {
                                     break;
                                 iteratedPasswords++;
                                 String str = decryptString(cipheredText, password, salt, counter);
-                                if (str.endsWith(end1)) {
+                                if (str.endsWith(end)) {
                                     writer.write(new String(password) + "::" + str);
                                     writer.newLine();
                                     writer.flush();
